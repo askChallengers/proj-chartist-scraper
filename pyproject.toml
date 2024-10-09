@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "proj-chartist"
+version = "0.1.0"
+description = ""
+authors = ["jaehyeok.choi <francis_bacon@naver.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pandas = "*"
+xmltodict = "*"
+openai = "*"
+bs4 = "*"
+oauth2client = "*"
+gspread = "*"
+python-dotenv = "*"
+selenium = "*"
+webdriver-manager = "*"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
