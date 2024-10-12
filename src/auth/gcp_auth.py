@@ -42,3 +42,10 @@ class GCPAuth():
             self.spreadsheet.add_worksheet(title=worksheet_name, rows=tmp.shape[0]+10, cols=tmp.shape[1]+5)
         worksheet = self.spreadsheet.worksheet(worksheet_name)
         worksheet.update([tmp.columns.values.tolist()] + tmp.values.tolist())
+
+    def update_google_sheet_column(self, df:pd.DataFrame, col_nm: str, sheet: get_worksheet) -> None:
+        col_idx = chr(65+df.columns.to_list().index(col_nm))
+        row_min, row_max = df.index.min()+1, df.index.max()+1
+        update_cells = f'{col_idx}{row_min}:{col_idx}{row_max}'
+        update_values = [[x] for x in df[col_nm].to_list()]
+        sheet.update(update_cells, update_values)
