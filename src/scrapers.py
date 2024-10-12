@@ -3,6 +3,8 @@ from urllib.parse import urljoin
 import pandas as pd
 import requests
 import xmltodict
+import pytz
+from datetime import datetime
 
 import time
 from urllib.parse import urljoin
@@ -17,6 +19,11 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from src.auth import GCPAuth
 from src.config.env import GOOGLE_SHEET_URL
+
+# KST (Korea Standard Time) 시간대를 설정
+kst = pytz.timezone('Asia/Seoul')
+cur = datetime.now(kst)
+
 def requests_get_xml(url) -> dict:
     response = requests.get(url)
     xml_data = response.content
@@ -24,9 +31,10 @@ def requests_get_xml(url) -> dict:
 
 class Scraper(ABC):
     # 클래스 변수
-    block_albums = GCPAuth(url=GOOGLE_SHEET_URL).get_df_from_google_sheets(sheet='block_albums')
-    official_channels = GCPAuth(url=GOOGLE_SHEET_URL).get_df_from_google_sheets(sheet='official_channels')
-    
+    gcp_auth = GCPAuth(url=GOOGLE_SHEET_URL)
+    block_albums = gcp_auth.get_df_from_google_sheets(sheet='block_albums')
+    official_channels = gcp_auth.get_df_from_google_sheets(sheet='official_channels')
+
     def __init__(self):
         self.official_channels.replace('', None, inplace=True)
         self.official_channels['artistId'] = pd.to_numeric(self.official_channels['artistId'])
@@ -206,3 +214,33 @@ class YoutubeScraper(Scraper):
             meta_by_3rd_party += [self._parse_content_info_by_3rd_party(identifier=_identifier, driver=driver)]
         driver.quit()
         return pd.DataFrame(meta_by_3rd_party)
+
+    def get_channel_img_url(self, channel: str, driver: webdriver.Chrome) -> str:
+        channel_url = f'https://www.youtube.com/{channel}'
+        driver.get(channel_url)
+        xpath = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/yt-decorated-avatar-view-model/yt-avatar-shape/div/div/div/img'
+        element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        return element.get_attribute('src')
+
+    def update_channel_info_sheet(self, sheet='official_channels'):
+        sheet = GCPAuth(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
+
+        # 크롤러로 이미지 파싱
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        img_dict = {}
+        for channel in self.official_channels['channel'].unique():
+            img_url = self.get_channel_img_url(channel=channel, driver=driver)
+            img_dict[channel] = img_url
+        driver.quit()
+
+        # 기존 시트 형태의 dataframe에 맞춰 넣기
+        for idx in self.official_channels.index:
+            tmp_channel = self.official_channels.at[idx, 'channel']
+
+            if self.official_channels.at[idx, 'img_url'] != img_dict[tmp_channel]:
+                self.official_channels.at[idx, 'img_url'] = img_dict[tmp_channel]
+                self.official_channels.at[idx, 'update_dt'] = cur.strftime('%Y-%m-%d %H:%M:%S')
+
+        # 구글 시트 업데이트
+        self.gcp_auth.update_google_sheet_column(self.official_channels, 'img_url', sheet)
+        self.gcp_auth.update_google_sheet_column(self.official_channels, 'update_dt', sheet)
