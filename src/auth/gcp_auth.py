@@ -16,5 +16,4 @@ class GCPAuth():
         else:
             #  키 파일 없이 기본 자격 증명 (ADC)을 사용
             self.credential, _ = default(scopes=self.scope, quota_project_id=PROJ_ID)
-
         self.project_id = PROJ_ID
