@@ -242,7 +242,7 @@ class YoutubeScraper(Scraper):
     @log_method_call
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
-        driver = webdriver.Chrome(service=, options=self.chrome_options)
+        driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
 
         for _keyword in keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
@@ -255,7 +255,7 @@ class YoutubeScraper(Scraper):
     @log_method_call
     def crawl_content_info_by_3rd_party(self, identifier_list: list) -> pd.DataFrame:
         meta_by_3rd_party = []
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
+        driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
 
         for _identifier in identifier_list:
             meta_by_3rd_party += [self._parse_content_info_by_3rd_party(identifier=_identifier, driver=driver)]
@@ -275,7 +275,7 @@ class YoutubeScraper(Scraper):
         sheet = GSheetsConn(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
 
         # 크롤러로 이미지 파싱
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
+        driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
         img_dict = {}
         for channel in self.official_channels['channel'].unique():
             img_url = self.get_channel_img_url(channel=channel, driver=driver)
