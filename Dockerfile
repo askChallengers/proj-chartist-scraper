@@ -20,6 +20,6 @@ RUN poetry export --without-hashes --format=requirements.txt > requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Chrome
-RUN apt-get update && apt-get install -y sudo wget
+RUN apt-get update && apt-get install -y wget
 RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb 
-RUN sudo dpkg -i google-chrome-stable_current_amd64.deb
+RUN dpkg -i google-chrome-stable_current_amd64.deb || ( apt-get install -f -y && dpkg -i google-chrome-stable_current_amd64.deb)
