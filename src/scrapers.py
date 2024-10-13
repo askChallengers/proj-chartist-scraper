@@ -178,7 +178,7 @@ class YoutubeScraper(Scraper):
         if EXECUTE_ENV == 'LOCAL':
             self.service = Service(ChromeDriverManager().install())
         else:
-            self.service = Service('/usr/bin/chromedriver')
+            self.service = None
             self.chrome_options.add_argument('--disable-dev-shm-usage') # 공유 메모리 사용하지 않도록 하는 옵션
 
         if is_headless:
