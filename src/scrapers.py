@@ -19,7 +19,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from src.config.helper import log_method_call
 from src.connection.gsheets import GSheetsConn
 from src.connection.bigquery import BigQueryConn
-from src.config.env import GOOGLE_SHEET_URL
+from src.config.env import GOOGLE_SHEET_URL, EXECUTE_ENV
 
 # KST (Korea Standard Time) 시간대를 설정
 kst = pytz.timezone('Asia/Seoul')
@@ -55,7 +55,6 @@ class VibeScraper(Scraper):
     def __init__(self):
         super().__init__()
     
-    @log_method_call
     def get_artist_info(self, artistId: str) -> dict:
         end_point = 'vibeWeb/musicapiweb/vibe/v1/artist/<artistId>/info.json'.replace('<artistId>', str(artistId))
         url = urljoin(self.base_url, end_point)
@@ -174,9 +173,15 @@ class YoutubeScraper(Scraper):
     @log_method_call
     def __init__(self, is_headless: bool):
         super().__init__()
+        self.chrome_options = webdriver.ChromeOptions()
+
+        if EXECUTE_ENV == 'LOCAL':
+            self.service = Service(ChromeDriverManager().install())
+        else:
+            self.service = Service('/usr/bin/chromedriver')
+            self.chrome_options.add_argument('--disable-dev-shm-usage') # 공유 메모리 사용하지 않도록 하는 옵션
 
         if is_headless:
-            self.chrome_options = webdriver.ChromeOptions()
             self.chrome_options.add_argument('window-size=1920x1080')
             self.chrome_options.add_argument("disable-gpu")
             self.chrome_options.add_argument('headless')
@@ -237,7 +242,7 @@ class YoutubeScraper(Scraper):
     @log_method_call
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
-        driver = webdriver.Chrome(options=self.chrome_options)
+        driver = webdriver.Chrome(service=, options=self.chrome_options)
 
         for _keyword in keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
@@ -250,7 +255,7 @@ class YoutubeScraper(Scraper):
     @log_method_call
     def crawl_content_info_by_3rd_party(self, identifier_list: list) -> pd.DataFrame:
         meta_by_3rd_party = []
-        driver = webdriver.Chrome(options=self.chrome_options)
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
 
         for _identifier in identifier_list:
             meta_by_3rd_party += [self._parse_content_info_by_3rd_party(identifier=_identifier, driver=driver)]
@@ -270,7 +275,7 @@ class YoutubeScraper(Scraper):
         sheet = GSheetsConn(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
 
         # 크롤러로 이미지 파싱
-        driver = webdriver.Chrome(options=self.chrome_options)
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
         img_dict = {}
         for channel in self.official_channels['channel'].unique():
             img_url = self.get_channel_img_url(channel=channel, driver=driver)
