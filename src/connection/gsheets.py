@@ -2,7 +2,7 @@ from datetime import datetime
 import pytz
 import pandas as pd
 import gspread
-from src.auth.gcp_auth import GCPAuth
+from src.connection.gcp_auth import GCPAuth
 
 class GSheetsConn(GCPAuth):
     def __init__(self, url) -> None:

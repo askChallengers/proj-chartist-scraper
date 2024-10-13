@@ -8,7 +8,7 @@ import pandas_gbq
 
 from google.cloud import bigquery
 from google.api_core.exceptions import NotFound
-from src.auth.gcp_auth import GCPAuth
+from src.connection.gcp_auth import GCPAuth
 from src.config.helper import log_method_call
 class BigQueryConn(GCPAuth):
     def __init__(self, scope=None):
