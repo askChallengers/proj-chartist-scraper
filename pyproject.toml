@@ -19,6 +19,7 @@ selenium = "*"
 webdriver-manager = "*"
 google-cloud-bigquery = "*"
 pandas-gbq = "*"
+slack-sdk = "*"
 
 
 [build-system]
