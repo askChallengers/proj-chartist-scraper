@@ -16,8 +16,9 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-
-from src.auth import GCPAuth
+from src.config.helper import log_method_call
+from src.connection.gsheets import GSheetsConn
+from src.connection.bigquery import BigQueryConn
 from src.config.env import GOOGLE_SHEET_URL
 
 # KST (Korea Standard Time) 시간대를 설정
@@ -31,28 +32,46 @@ def requests_get_xml(url) -> dict:
 
 class Scraper(ABC):
     # 클래스 변수
-    gcp_auth = GCPAuth(url=GOOGLE_SHEET_URL)
-    block_albums = gcp_auth.get_df_from_google_sheets(sheet='block_albums')
-    official_channels = gcp_auth.get_df_from_google_sheets(sheet='official_channels')
-
+    gs_cleint = GSheetsConn(url=GOOGLE_SHEET_URL)
+    bq_cleint = BigQueryConn()
+    except_albums = gs_cleint.get_df_from_google_sheets(sheet='except_albums')
+    except_artists = gs_cleint.get_df_from_google_sheets(sheet='except_artists')
+    official_channels = gs_cleint.get_df_from_google_sheets(sheet='official_channels')
+    
+    @log_method_call
     def __init__(self):
         self.official_channels.replace('', None, inplace=True)
         self.official_channels['artistId'] = pd.to_numeric(self.official_channels['artistId'])
-        self.block_albums['artistId'] = pd.to_numeric(self.block_albums['artistId']) 
-        self.block_albums['albumId'] = pd.to_numeric(self.block_albums['albumId'])
+
+        self.except_albums['artistId'] = pd.to_numeric(self.except_albums['artistId']) 
+        self.except_albums['albumId'] = pd.to_numeric(self.except_albums['albumId'])
+
+        self.except_artists['artistId'] = pd.to_numeric(self.except_artists['artistId'])
     
 class VibeScraper(Scraper):
     base_url = 'https://apis.naver.com'
 
+    @log_method_call
     def __init__(self):
         super().__init__()
+    
+    @log_method_call
+    def get_artist_info(self, artistId: str) -> dict:
+        end_point = 'vibeWeb/musicapiweb/vibe/v1/artist/<artistId>/info.json'.replace('<artistId>', str(artistId))
+        url = urljoin(self.base_url, end_point)
+        response = requests.get(url)
+        dict_data = response.json()['response']['result']['artistEnd']
+        keys_to_get = ['artistId', 'gender', 'isGroup', 'managementName', 'biography', 'genreNames']
+        filtered_data = {key: dict_data[key] for key in keys_to_get if key in dict_data}
+        return filtered_data
 
+    @log_method_call
     def get_top100_chart(self) -> pd.DataFrame:
         end_point = 'vibeWeb/musicapiweb/vibe/v1/chart/track/genres/DS101?start=1&display=100'
         url = urljoin(self.base_url, end_point)
         dict_data = requests_get_xml(url)
         track_list = dict_data['response']['result']['chart']['items']['tracks']['track']
-        result = pd.DataFrame(columns=['rank', 'trackTitle', 'artistName', 'artistId'])
+        result = pd.DataFrame(columns=['vibe_rank', 'trackTitle', 'artistName', 'artistId'])
         for _r, _track in enumerate(track_list):
             trackTitle = _track['trackTitle']
             if isinstance(_track['artists']['artist'], list):
@@ -62,19 +81,22 @@ class VibeScraper(Scraper):
             else:
                 artistName = _track['artists']['artist']['artistName']
                 artistId = _track['artists']['artist']['artistId']
-            row = pd.DataFrame([{'rank': _r+1, 'trackTitle': trackTitle, 'artistName': artistName, 'artistId': artistId}])
+            row = pd.DataFrame([{'vibe_rank': _r+1, 'trackTitle': trackTitle, 'artistName': artistName, 'artistId': artistId}])
             result = pd.concat([result, row], ignore_index=True)
         result['artistId'] = result['artistId'].astype(int)
+        result['vibe_rank'] = result['vibe_rank'].astype(int)
         return result
 
+    @log_method_call
     def get_latest_album_info_by_artistId(self, artistId: int, block_albumIds: list) -> pd.DataFrame:
         end_point = 'vibeWeb/musicapiweb/v3/musician/artist/<artistId>/albums?start=1&display=10&type=ALL&sort=newRelease'.replace('<artistId>', str(artistId))
         url = urljoin(self.base_url, end_point)
         dict_data = requests_get_xml(url)
-        
-        for _album in dict_data['response']['result']['albums']['album']:
+        album_list = dict_data['response']['result']['albums']['album']
+        album_list = album_list if isinstance(album_list, list) else [album_list]
+        for _album in album_list:
             # 제외: 협업 OR 자체블락
-            specific_info = self.get_specific_album_info(_album['albumId'])
+            specific_info = self.get_specific_album_info(int(_album['albumId']))
             if specific_info['albumGenres'] == 'J-팝' or specific_info['artistTotalCount'] > 1 or int(_album['albumId']) in block_albumIds:
                 continue
             track_list_df = self.get_tracks_info_by_albumId(_album['albumId'])
@@ -82,9 +104,10 @@ class VibeScraper(Scraper):
             result = latest_album.merge(track_list_df, on='albumId', how='left')
             break
         result['artistId'] = artistId
-        result['albumId'] = result['albumId'].astype(int)
+        result['albumId'] = pd.to_numeric(result['albumId'])
         return result
 
+    @log_method_call
     def get_specific_album_info(self, albumId: int) -> dict:
         end_point = 'vibeWeb/musicapiweb/album/<albumId>?includeDesc=true&includeIntro=true'.replace('<albumId>', str(albumId))
         url = urljoin(self.base_url, end_point)
@@ -92,35 +115,48 @@ class VibeScraper(Scraper):
         album_info = dict_data['response']['result']['album']
         album_info['artistTotalCount'] = int(album_info['artistTotalCount'])
         return album_info
-        
+    
+    @log_method_call
     def get_tracks_info_by_albumId(self, albumId: int) -> pd.DataFrame:
-        end_point = 'vibeWeb/musicapiweb/album/<albumId>/tracks?start=1&display=1000'.replace('<albumId>', albumId)
+        end_point = 'vibeWeb/musicapiweb/album/<albumId>/tracks?start=1&display=1000'.replace('<albumId>', str(albumId))
         url = urljoin(self.base_url, end_point)
         dict_data = requests_get_xml(url)
-        result = pd.DataFrame(dict_data['response']['result']['tracks']['track'])
+        
+        trackTotalCount = int(dict_data['response']['result']['trackTotalCount'])
+        if trackTotalCount == 1:
+            result = pd.DataFrame([dict_data['response']['result']['tracks']['track']])
+        else:
+            result = pd.DataFrame(dict_data['response']['result']['tracks']['track'])
+        
         result[['trackId', 'likeCount']] = result[['trackId', 'likeCount']].astype(int)
-        result[['represent', 'isOversea', 'isTopPopular']] = result[['represent', 'isOversea', 'isTopPopular']].astype(bool)
+        result[['represent', 'isOversea', 'isTopPopular']] = result[['represent', 'isOversea', 'isTopPopular']].replace({
+            'true': True, 
+            'false': False
+        })
         result['albumId'] = albumId
         return result[
             ['trackId', 'trackTitle', 'represent', 'albumId', 'isOversea', 'likeCount', 'score', 'isTopPopular']
         ]
     
-    def get_target_info_by_vibe(self):
+    @log_method_call
+    def get_target_info_by_vibe(self, ranking:int=100):
         # top100 차트에서 가수 정보만 추출한다.
         chart_df = self.get_top100_chart()
-        chart_df.loc[chart_df['rank'].isin(range(100)), ['artistId', 'artistName']].drop_duplicates()
-        # 구글 시트에 저장된 타겟 가수의 정보를 가져와서 붙인다.
-        artist_info = chart_df[['artistId', 'artistName']].drop_duplicates().merge(
-            Scraper.official_channels.drop(columns=['artistName']),
-            on='artistId',
-            how='inner',
-        )
+        artist_info = chart_df.loc[
+            chart_df['vibe_rank'].isin(range(ranking+1)) &\
+            ~chart_df['artistId'].isin(self.except_artists['artistId']),
+            ['vibe_rank', 'artistId', 'artistName']
+        ].sort_values(by='vibe_rank').drop_duplicates(keep='first')
 
         # 각 타겟 가수별 제외 대상 앨범 외의 최신 앨범 정보를 가져온다.
         latest_album_info_by_artistId = []
         for _artistId in artist_info['artistId'].unique():
-            tmp_block_album_list =  Scraper.block_albums[lambda x: x['artistId'] == _artistId]['albumId'].to_list()
-            tmp = self.get_latest_album_info_by_artistId(_artistId, tmp_block_album_list)
+            specific_artist_info = self.get_artist_info(_artistId)
+            if specific_artist_info['isGroup'] == False:
+                continue
+            tmp_block_album_list =  Scraper.except_albums[lambda x: x['artistId'] == _artistId]['albumId'].to_list()
+            latest_album_info = self.get_latest_album_info_by_artistId(int(_artistId), tmp_block_album_list)
+            tmp = latest_album_info.merge(pd.DataFrame([specific_artist_info]), on='artistId', how='left')
             latest_album_info_by_artistId += [tmp]
         latest_album_info_by_artistId = pd.concat(latest_album_info_by_artistId).reset_index(drop=True)
 
@@ -128,20 +164,29 @@ class VibeScraper(Scraper):
         total_info = artist_info.merge(latest_album_info_by_artistId, on='artistId', how='left')
 
         # 가수:앨범:노래=1:1:1로 하기 위해, 타이틀곡에 대해서만 가져오되, 멀티 타이틀인 경우, 그 중 likeCount 높은 걸 가져온다.
-        total_info = total_info[total_info['represent'] == True]\
-            .sort_values(by=['likeCount'], ascending=False)\
+        total_info = total_info.loc[total_info['represent'] == True]\
+            .sort_values(by=['gender', 'vibe_rank'], ascending=False)\
             .drop_duplicates(subset=['artistId'], keep='first')[
-            ['artistName', 'channel', 'trackTitle', 'albumTitle']
+            ['gender', 'artistId', 'artistName', 'trackTitle', 'albumId', 'albumTitle', 'vibe_rank']
         ].reset_index(drop=True)
 
         return total_info
 
 class YoutubeScraper(Scraper):
     base_url = 'https://www.youtube.com'
-
-    def __init__(self):
+    @log_method_call
+    def __init__(self, is_headless: bool):
         super().__init__()
 
+        if is_headless:
+            self.chrome_options = webdriver.ChromeOptions()
+            self.chrome_options.add_argument('window-size=1920x1080')
+            self.chrome_options.add_argument("disable-gpu")
+            self.chrome_options.add_argument('headless')
+        else:
+            self.chrome_options = None
+    
+    @log_method_call
     def _parse_content_info_by_youtube(self, keyword: str, driver: webdriver.Chrome) -> dict:
         end_point = f'results?search_query={keyword}'
         url = urljoin(self.base_url, end_point)
@@ -151,22 +196,27 @@ class YoutubeScraper(Scraper):
         # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
         elem = elements[0]
         specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
-        mv_channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
-        mv_channel = mv_channel.replace('https://www.youtube.com/', '')
         
         mv_title = specific_title_elem.get_attribute("title")
         mv_identifier = specific_title_elem.get_attribute("href")
         mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
         mv_link = f'https://www.youtube.com/watch?v={mv_identifier}'
-        
+        channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
+        if not channel.startswith('@'):
+            driver.get(channel)
+            channel_section = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/div/yt-content-metadata-view-model/div[1]/span'
+            WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
+            channel = driver.find_element(by=By.XPATH, value=channel_section).text
+        channel = channel.replace('https://www.youtube.com/', '')
         return {
             'searchKeyword': keyword,
+            'channel': channel,
             'mv_identifier': mv_identifier,
             'mv_title': mv_title,
-            'mv_channel': mv_channel,
             'mv_link':mv_link,
         }
-
+    
+    @log_method_call
     def _parse_content_info_by_3rd_party(self, identifier:str, driver: webdriver.Chrome) -> dict:
         counter_url = f'https://youtubelikecounter.com/#!/{identifier}'
         driver.get(counter_url)
@@ -187,46 +237,43 @@ class YoutubeScraper(Scraper):
             'mv_comments':mv_comments,
         }
 
+    @log_method_call
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
 
         for _keyword in keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
         driver.quit()
         meta_by_youtube = pd.DataFrame(meta_by_youtube)
-
-        # 크롤링 된 데이터가 official 채널인지 확인
-        sub_channels_map = { 
-            Scraper.official_channels.at[i, 'sub_channel'] : Scraper.official_channels.at[i, 'channel']
-            for i in Scraper.official_channels.loc[Scraper.official_channels['sub_channel'] != '', ['channel', 'sub_channel']].index
-        }
-        meta_by_youtube['mv_channel'] = meta_by_youtube['mv_channel'].apply(lambda x: sub_channels_map[x] if x in sub_channels_map.keys() else x)
-        meta_by_youtube['is_official_channel'] = meta_by_youtube['mv_channel'].apply(lambda x: True if x in Scraper.official_channels['channel'].to_list() else False)
+        meta_by_youtube['is_official_channel'] = meta_by_youtube['channel'].apply(lambda x: True if x in Scraper.official_channels['channel'].to_list() else False)
 
         return meta_by_youtube
     
+    @log_method_call
     def crawl_content_info_by_3rd_party(self, identifier_list: list) -> pd.DataFrame:
         meta_by_3rd_party = []
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
 
         for _identifier in identifier_list:
             meta_by_3rd_party += [self._parse_content_info_by_3rd_party(identifier=_identifier, driver=driver)]
         driver.quit()
         return pd.DataFrame(meta_by_3rd_party)
-
+    
+    @log_method_call
     def get_channel_img_url(self, channel: str, driver: webdriver.Chrome) -> str:
         channel_url = f'https://www.youtube.com/{channel}'
         driver.get(channel_url)
         xpath = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/yt-decorated-avatar-view-model/yt-avatar-shape/div/div/div/img'
         element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
         return element.get_attribute('src')
-
+    
+    @log_method_call
     def update_channel_info_sheet(self, sheet='official_channels'):
-        sheet = GCPAuth(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
+        sheet = GSheetsConn(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
 
         # 크롤러로 이미지 파싱
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()))
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=self.chrome_options)
         img_dict = {}
         for channel in self.official_channels['channel'].unique():
             img_url = self.get_channel_img_url(channel=channel, driver=driver)
@@ -242,5 +289,6 @@ class YoutubeScraper(Scraper):
                 self.official_channels.at[idx, 'update_dt'] = cur.strftime('%Y-%m-%d %H:%M:%S')
 
         # 구글 시트 업데이트
-        self.gcp_auth.update_google_sheet_column(self.official_channels, 'img_url', sheet)
-        self.gcp_auth.update_google_sheet_column(self.official_channels, 'update_dt', sheet)
+        self.gs_cleint.update_google_sheet_column(self.official_channels, 'img_url', sheet)
+        self.gs_cleint.update_google_sheet_column(self.official_channels, 'update_dt', sheet)
+        return self.official_channels
