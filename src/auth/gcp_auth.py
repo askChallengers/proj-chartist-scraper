@@ -4,7 +4,7 @@ import pandas as pd
 import gspread
 from google.auth import default
 from google.oauth2.service_account import Credentials
-from src.config.env import GCP_KEY_PATH, EXECUTE_ENV
+from src.config.env import GCP_KEY_PATH, EXECUTE_ENV, PROJ_ID
 
 class GCPAuth():
     def __init__(self, scope=None) -> None:
@@ -15,7 +15,7 @@ class GCPAuth():
             self.credential = Credentials.from_service_account_file(GCP_KEY_PATH, scopes=self.scope)
         else:
             #  키 파일 없이 기본 자격 증명 (ADC)을 사용
-            self.credential, _ = default(scopes=self.scope)
+            self.credential, _ = default(scopes=self.scope, quota_project_id=PROJ_ID)
 
         self.project_id = self.credential.project_id
         
