@@ -8,6 +8,7 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.9"
 pandas = "*"
+numpy = "*"
 xmltodict = "*"
 openai = "*"
 bs4 = "*"
@@ -16,6 +17,8 @@ gspread = "*"
 python-dotenv = "*"
 selenium = "*"
 webdriver-manager = "*"
+google-cloud-bigquery = "*"
+pandas-gbq = "*"
 
 
 [build-system]
