@@ -197,7 +197,7 @@ class YoutubeScraper(Scraper):
         xpath_value = '//*[@id="watch7-content"]/meta[11]'
         WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
         str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
-        view_count = re.sub(r'[^0-9]', '', str_view_count)
+        view_count = int(re.sub(r'[^0-9]', '', str_view_count))
         
         # str_comment_count = driver.find_element(by=By.XPATH, value='//*[@id="count"]/yt-formatted-string/span[1]').text
         # comment_count = re.sub(r'[^0-9]', '', str_comment_count)
