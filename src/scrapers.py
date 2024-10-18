@@ -1,6 +1,7 @@
 from abc import ABC
 from urllib.parse import urljoin
 import pandas as pd
+import re
 import requests
 import xmltodict
 import pytz
@@ -150,6 +151,9 @@ class VibeScraper(Scraper):
             specific_artist_info = self.get_artist_info(_artistId)
             if specific_artist_info['isGroup'] == False:
                 continue
+            if specific_artist_info['gender'] not in ('남성', '여성'):
+                continue
+
             tmp_block_album_list =  Scraper.except_albums[lambda x: x['artistId'] == _artistId]['albumId'].to_list()
             latest_album_info = self.get_latest_album_info_by_artistId(int(_artistId), tmp_block_album_list)
             tmp = latest_album_info.merge(pd.DataFrame([specific_artist_info]), on='artistId', how='left')
@@ -188,6 +192,24 @@ class YoutubeScraper(Scraper):
         else:
             self.chrome_options = None
     
+    def _parse_content_count_info(self, mv_link: str, driver: webdriver.Chrome) -> dict:
+        driver.get(mv_link)
+        xpath_value = '//*[@id="watch7-content"]/meta[11]'
+        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
+        str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
+        view_count = re.sub(r'[^0-9]', '', str_view_count)
+        
+        # str_comment_count = driver.find_element(by=By.XPATH, value='//*[@id="count"]/yt-formatted-string/span[1]').text
+        # comment_count = re.sub(r'[^0-9]', '', str_comment_count)
+        return {'view_count': view_count}
+
+    def _parse_channel_url(self, channel_href: str, driver: webdriver.Chrome):
+        driver.get(channel_href)
+        channel_section = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/div/yt-content-metadata-view-model/div[1]/span'
+        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
+        channel = driver.find_element(by=By.XPATH, value=channel_section).text
+        return channel
+    
     @log_method_call
     def _parse_content_info_by_youtube(self, keyword: str, driver: webdriver.Chrome) -> dict:
         end_point = f'results?search_query={keyword}'
@@ -205,17 +227,17 @@ class YoutubeScraper(Scraper):
         mv_link = f'https://www.youtube.com/watch?v={mv_identifier}'
         channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
         if not channel.startswith('@'):
-            driver.get(channel)
-            channel_section = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/div/yt-content-metadata-view-model/div[1]/span'
-            WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
-            channel = driver.find_element(by=By.XPATH, value=channel_section).text
+            channel = self._parse_channel_url(channel_href=channel, driver=driver)
         channel = channel.replace('https://www.youtube.com/', '')
+        mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
         return {
             'searchKeyword': keyword,
             'channel': channel,
             'mv_identifier': mv_identifier,
             'mv_title': mv_title,
             'mv_link':mv_link,
+            'view_count': mv_count_info['view_count'],
+            # 'comment_count': mv_count_info['comment_count'],
         }
     
     @log_method_call
@@ -224,14 +246,23 @@ class YoutubeScraper(Scraper):
         driver.get(counter_url)
         driver.refresh()
         time.sleep(5)
-        mv_views = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[1]').text
-        mv_likes = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[2]').text
-        mv_comments = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[4]').text
+        mv_views, mv_likes, mv_comments = 0, 0, 0
+        cnt = 0
+        while cnt < 30:
+            str_mv_views = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[1]').text
+            str_mv_likes = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[2]').text
+            str_mv_comments = driver.find_element(by=By.XPATH, value='//*[@id="__next"]/div/div[1]/div[4]').text
+            
+            mv_views = int(str_mv_views.replace('\n', '').replace(',', ''))
+            mv_likes = int(str_mv_likes.replace('\n', '').replace(',', ''))
+            mv_comments = int(str_mv_comments.replace('\n', '').replace(',', ''))
 
-        mv_views = int(mv_views.replace('\n', '').replace(',', ''))
-        mv_likes = int(mv_likes.replace('\n', '').replace(',', ''))
-        mv_comments = int(mv_comments.replace('\n', '').replace(',', ''))
-        
+            print(identifier, cnt, mv_views, mv_likes, mv_comments)
+            if 0 not in (mv_views, mv_likes, mv_comments):
+                break
+            time.sleep(1)
+            cnt += 1
+
         return {
             'mv_identifier': identifier,
             'mv_views':mv_views,
