@@ -195,7 +195,7 @@ class YoutubeScraper(Scraper):
     def _parse_content_count_info(self, mv_link: str, driver: webdriver.Chrome) -> dict:
         driver.get(mv_link)
         xpath_value = '//*[@id="watch7-content"]/meta[11]'
-        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
+        WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
         str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
         view_count = int(re.sub(r'[^0-9]', '', str_view_count))
         
@@ -206,7 +206,7 @@ class YoutubeScraper(Scraper):
     def _parse_channel_url(self, channel_href: str, driver: webdriver.Chrome):
         driver.get(channel_href)
         channel_section = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/div/yt-content-metadata-view-model/div[1]/span'
-        WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
+        WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
         channel = driver.find_element(by=By.XPATH, value=channel_section).text
         return channel
     
@@ -216,7 +216,7 @@ class YoutubeScraper(Scraper):
         url = urljoin(self.base_url, end_point)
         driver.get(url)
         
-        elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
+        elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
         # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
         elem = elements[0]
         specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
@@ -298,7 +298,7 @@ class YoutubeScraper(Scraper):
         channel_url = f'https://www.youtube.com/{channel}'
         driver.get(channel_url)
         xpath = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/yt-decorated-avatar-view-model/yt-avatar-shape/div/div/div/img'
-        element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
+        element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath)))
         return element.get_attribute('src')
     
     @log_method_call
