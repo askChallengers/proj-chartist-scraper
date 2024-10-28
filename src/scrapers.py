@@ -244,7 +244,7 @@ class YoutubeScraper(Scraper):
                 mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
                 return {
                     'searchKeyword': keyword,
-                    'channel': channel,
+                    'mv_channel': channel,
                     'mv_identifier': mv_identifier,
                     'mv_title': mv_title,
                     'mv_link':mv_link,
@@ -296,7 +296,7 @@ class YoutubeScraper(Scraper):
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
         driver.quit()
         meta_by_youtube = pd.DataFrame(meta_by_youtube)
-        meta_by_youtube['is_official_channel'] = meta_by_youtube['channel'].apply(lambda x: True if x in Scraper.official_channels['channel'].to_list() else False)
+        meta_by_youtube['is_official_channel'] = meta_by_youtube['mv_channel'].apply(lambda x: True if x in Scraper.official_channels['channel'].to_list() else False)
 
         return meta_by_youtube
     
