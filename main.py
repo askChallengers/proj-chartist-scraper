@@ -1,8 +1,11 @@
 import pytz
+import warnings
 from datetime import datetime
 import pandas as pd
 from src.scrapers import VibeScraper, YoutubeScraper
 from src.connection.bigquery import BigQueryConn
+warnings.filterwarnings('ignore')
+
 # KST (Korea Standard Time) 시간대를 설정
 today = datetime.now(pytz.timezone('Asia/Seoul')).date()
 bq_conn = BigQueryConn()

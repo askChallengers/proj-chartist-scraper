@@ -14,6 +14,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -178,12 +179,15 @@ class YoutubeScraper(Scraper):
     def __init__(self, is_headless: bool):
         super().__init__()
         self.chrome_options = webdriver.ChromeOptions()
-
+        # 한국어 언어 설정
+        self.chrome_options.add_argument("--lang=ko-KR")
+        self.chrome_options.add_argument("Accept-Language=ko-KR")
         if EXECUTE_ENV == 'LOCAL':
             self.service = Service(ChromeDriverManager().install())
         else:
             self.service = None
             self.chrome_options.add_argument('--disable-dev-shm-usage') # 공유 메모리 사용하지 않도록 하는 옵션
+
         if is_headless:
             self.chrome_options.add_argument("--no-sandbox") #샌드박스 모드 해제(보안 문제있을 수 있음)
             self.chrome_options.add_argument('window-size=1920x1080')
@@ -214,13 +218,19 @@ class YoutubeScraper(Scraper):
     def _parse_content_info_by_youtube(self, keyword: str, driver: webdriver.Chrome) -> dict:
         end_point = f'results?search_query={keyword}'
         url = urljoin(self.base_url, end_point)
-        driver.get(url)
-        
-        elements = WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
-        # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
-        elem = elements[0]
-        specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
-        
+        for _ in range(5):
+            try:
+                driver.get(url)
+                elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
+                # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
+                elem = elements[0]
+                specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
+            except TimeoutException:
+                print('- TIMEOUT: GET THE FAKE KEYWORD')
+                driver.get(url+'_FAKE_KEYWORD')
+                time.sleep(3)
+            except Exception as e:
+                raise e
         mv_title = specific_title_elem.get_attribute("title")
         mv_identifier = specific_title_elem.get_attribute("href")
         mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
@@ -274,7 +284,6 @@ class YoutubeScraper(Scraper):
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
-
         for _keyword in keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
         driver.quit()
