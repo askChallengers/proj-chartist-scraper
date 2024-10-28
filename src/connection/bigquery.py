@@ -42,6 +42,16 @@ class BigQueryConn(GCPAuth):
     
     @log_method_call
     def insert(self, df: pd.DataFrame, table_id: str, data_set:str, if_exists: str='append'):
+        try:
+            table_info = self.client.get_table(f"{self.project_id}.{data_set}.{table_id}")
+            table_schema = [x.name for x in table_info.schema]
+            df = df[table_schema]
+        except NotFound as e:
+            print('Target table does not exist, So create table.')
+            schema = self.extract_schema_from_df(df)
+            table = bigquery.Table(f'{self.project_id}.{data_set}.{table_id}', schema=schema)
+            self.client.create_table(table)  # Make an API request.
+            
         df = self.preprocess_for_insert(df)
         pandas_gbq.to_gbq(dataframe=df, destination_table=f"{data_set}.{table_id}", project_id=self.project_id, if_exists=if_exists, credentials=self.credential)
 
