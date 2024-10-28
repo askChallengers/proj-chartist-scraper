@@ -18,17 +18,23 @@ target_info_by_vibe['searchKeyword'] = target_info_by_vibe.apply(lambda x: f"{x[
 channel_info = youtube_scraper.update_channel_info_sheet()
 
 meta_by_youtube = youtube_scraper.crawl_youtube_search(target_info_by_vibe['searchKeyword'].unique())
-meta_by_youtube = meta_by_youtube.merge(channel_info[['channel', 'img_url']], on='channel', how='left')
-
-# meta_by_3rd_party = youtube_scraper.crawl_content_info_by_3rd_party(meta_by_youtube['mv_identifier'].unique())
-# total_youtube_info = meta_by_youtube.merge(meta_by_3rd_party, on='mv_identifier', how='left')
 
 total_info = target_info_by_vibe.merge(
     meta_by_youtube,
     on='searchKeyword',
     how='left',
+).merge(
+    channel_info[['artistId', 'channel', 'img_url']], on='artistId', how='left'
 )
 
 total_info['reg_date'] = pd.to_datetime(today)
 today_str = today.strftime('%Y-%m-%d')
+
+total_info = total_info[[
+    'gender', 'artistId', 'artistName', 'trackTitle', 'albumId', 'albumTitle', 'vibe_rank', 
+    'searchKeyword', 
+    'channel', 'img_url',
+    'mv_channel', 'mv_identifier', 'mv_title', 'mv_link', 'view_count', 'is_official_channel',
+    'reg_date'
+]]
 bq_conn.upsert(df=total_info, table_id='daily_report', data_set='chartist', target_dict={'reg_date': today_str})
