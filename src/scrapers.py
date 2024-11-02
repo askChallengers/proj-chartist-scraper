@@ -197,23 +197,19 @@ class YoutubeScraper(Scraper):
             self.chrome_options = None
     
     def _parse_content_count_info(self, mv_link: str, driver: webdriver.Chrome) -> dict:
-        for _ in range(5):
-            try:
-                driver.get(mv_link)
-                xpath_value = '//*[@id="watch7-content"]/meta[11]'
-                WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
-                str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
-                view_count = int(re.sub(r'[^0-9]', '', str_view_count))
-                return {'view_count': view_count}
-            except TimeoutException:
-                print('- TIMEOUT: GET THE FAKE KEYWORD')
-                driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
-                time.sleep(3)
-            except Exception as e:
-                raise e
-        # str_comment_count = driver.find_element(by=By.XPATH, value='//*[@id="count"]/yt-formatted-string/span[1]').text
-        # comment_count = re.sub(r'[^0-9]', '', str_comment_count)
-        
+        try:
+            driver.get(mv_link)
+            xpath_value = '//*[@id="watch7-content"]/meta[11]'
+            WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
+            str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
+            view_count = int(re.sub(r'[^0-9]', '', str_view_count))
+            return {'view_count': view_count}
+        except TimeoutException:
+            print('- TIMEOUT: GET THE FAKE KEYWORD')
+            driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
+            time.sleep(3)
+        except Exception as e:
+            raise e
 
     def _parse_channel_url(self, channel_href: str, driver: webdriver.Chrome):
         driver.get(channel_href)
@@ -226,37 +222,36 @@ class YoutubeScraper(Scraper):
     def _parse_content_info_by_youtube(self, keyword: str, driver: webdriver.Chrome) -> dict:
         end_point = f'results?search_query={keyword}'
         url = urljoin(self.base_url, end_point)
-        for _ in range(5):
-            try:
-                driver.get(url)
-                elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
-                # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
-                elem = elements[0]
-                specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
-                mv_title = specific_title_elem.get_attribute("title")
-                mv_identifier = specific_title_elem.get_attribute("href")
-                mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
-                mv_link = f'https://www.youtube.com/watch?v={mv_identifier}'
-                channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
-                if not channel.startswith('@'):
-                    channel = self._parse_channel_url(channel_href=channel, driver=driver)
-                channel = channel.replace('https://www.youtube.com/', '')
-                mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
-                return {
-                    'searchKeyword': keyword,
-                    'mv_channel': channel,
-                    'mv_identifier': mv_identifier,
-                    'mv_title': mv_title,
-                    'mv_link':mv_link,
-                    'view_count': mv_count_info['view_count'],
-                    # 'comment_count': mv_count_info['comment_count'],
-                }
-            except TimeoutException:
-                print('- TIMEOUT: GET THE FAKE KEYWORD')
-                driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
-                time.sleep(3)
-            except Exception as e:
-                raise e
+        try:
+            driver.get(url)
+            elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
+            # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
+            elem = elements[0]
+            specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
+            mv_title = specific_title_elem.get_attribute("title")
+            mv_identifier = specific_title_elem.get_attribute("href")
+            mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
+            mv_link = f'https://www.youtube.com/watch?v={mv_identifier}'
+            channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
+            if not channel.startswith('@'):
+                channel = self._parse_channel_url(channel_href=channel, driver=driver)
+            channel = channel.replace('https://www.youtube.com/', '')
+            mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
+            return {
+                'searchKeyword': keyword,
+                'mv_channel': channel,
+                'mv_identifier': mv_identifier,
+                'mv_title': mv_title,
+                'mv_link':mv_link,
+                'view_count': mv_count_info['view_count'],
+                # 'comment_count': mv_count_info['comment_count'],
+            }
+        except TimeoutException:
+            print('- TIMEOUT: GET THE FAKE KEYWORD')
+            driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
+            time.sleep(3)
+        except Exception as e:
+            raise e
     
     @log_method_call
     def _parse_content_info_by_3rd_party(self, identifier:str, driver: webdriver.Chrome) -> dict:

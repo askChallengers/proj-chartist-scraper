@@ -4,6 +4,7 @@ from datetime import datetime
 import pandas as pd
 from src.scrapers import VibeScraper, YoutubeScraper
 from src.connection.bigquery import BigQueryConn
+from src.connection.slack import SlackClient
 warnings.filterwarnings('ignore')
 
 # KST (Korea Standard Time) 시간대를 설정
@@ -26,6 +27,17 @@ total_info = target_info_by_vibe.merge(
 ).merge(
     channel_info[['artistId', 'channel', 'img_url']], on='artistId', how='left'
 )
+
+except_artist = total_info.loc[total_info['img_url'].isna(), ['artistId', 'artistName']].drop_duplicates()
+
+title = "🚨[PROJ-CHARTIST-SCRAPER: 예외 아티스트 이슈]🚨"
+contents = ''
+for idx in except_artist.index:
+    _id = except_artist.at[idx, 'artistId']
+    _nm = except_artist.at[idx, 'artistName']
+    contents += f'*{_id}*: {_nm}\n'
+
+SlackClient().chat_postMessage(title, contents)
 
 total_info['reg_date'] = pd.to_datetime(today)
 today_str = today.strftime('%Y-%m-%d')
