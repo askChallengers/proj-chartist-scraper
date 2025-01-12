@@ -10,6 +10,7 @@ from google.cloud import bigquery
 from google.api_core.exceptions import NotFound
 from src.connection.gcp_auth import GCPAuth
 from src.config.helper import log_method_call
+
 class BigQueryConn(GCPAuth):
     def __init__(self, scope=None):
         super().__init__(scope=scope)
@@ -42,6 +43,7 @@ class BigQueryConn(GCPAuth):
     
     @log_method_call
     def insert(self, df: pd.DataFrame, table_id: str, data_set:str, if_exists: str='append'):
+        df = self.preprocess_for_insert(df)
         try:
             table_info = self.client.get_table(f"{self.project_id}.{data_set}.{table_id}")
             table_schema = [x.name for x in table_info.schema]
@@ -52,7 +54,6 @@ class BigQueryConn(GCPAuth):
             table = bigquery.Table(f'{self.project_id}.{data_set}.{table_id}', schema=schema)
             self.client.create_table(table)  # Make an API request.
             
-        df = self.preprocess_for_insert(df)
         pandas_gbq.to_gbq(dataframe=df, destination_table=f"{data_set}.{table_id}", project_id=self.project_id, if_exists=if_exists, credentials=self.credential)
 
     @log_method_call

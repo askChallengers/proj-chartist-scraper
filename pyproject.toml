@@ -20,6 +20,10 @@ webdriver-manager = "*"
 google-cloud-bigquery = "*"
 pandas-gbq = "*"
 slack-sdk = "*"
+google-apps-chat = "*"
+opencv-python = "*"
+matplotlib = "*"
+scikit-learn = "*"
 
 
 [build-system]
