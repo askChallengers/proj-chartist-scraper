@@ -2,9 +2,11 @@ import pytz
 import warnings
 from datetime import datetime
 import pandas as pd
-from src.scrapers import VibeScraper, YoutubeScraper
+from src.scrapers.vibe_scraper import VibeScraper
+from src.scrapers.youtube_scraper import YoutubeScraper
 from src.connection.bigquery import BigQueryConn
 from src.connection.slack import SlackClient
+from src.color_extractor import get_dominant_color_by_url
 warnings.filterwarnings('ignore')
 
 # KST (Korea Standard Time) 시간대를 설정
@@ -15,7 +17,6 @@ youtube_scraper = YoutubeScraper(is_headless=True)
 
 target_info_by_vibe = vibe_scraper.get_target_info_by_vibe(100)
 target_info_by_vibe['searchKeyword'] = target_info_by_vibe.apply(lambda x: f"{x['artistName']} {x['trackTitle']} official MV", axis=1)
-
 channel_info = youtube_scraper.update_channel_info_sheet()
 
 meta_by_youtube = youtube_scraper.crawl_youtube_search(target_info_by_vibe['searchKeyword'].unique())
@@ -27,6 +28,16 @@ total_info = target_info_by_vibe.merge(
 ).merge(
     channel_info[['artistId', 'channel', 'img_url']], on='artistId', how='left'
 )
+
+color_cnt = 3
+color_df = []
+color_cols = [f'color_{i+1}' for i in range(color_cnt)]
+for idx in total_info.loc[~total_info['img_url'].isna()].index:
+    url = total_info.at[idx, 'img_url']
+    dominant_colors = get_dominant_color_by_url(url=url, cnt=color_cnt)
+    color_df += [dominant_colors]
+color_df = pd.DataFrame(color_df)
+total_info = total_info.merge(color_df, on='img_url', how='left')
 
 except_artist = total_info.loc[total_info['img_url'].isna(), ['artistId', 'artistName']].drop_duplicates()
 
@@ -48,5 +59,5 @@ total_info = total_info[[
     'channel', 'img_url',
     'mv_channel', 'mv_identifier', 'mv_title', 'mv_link', 'view_count', 'is_official_channel',
     'reg_date'
-]]
+] + color_cols]
 bq_conn.upsert(df=total_info, table_id='daily_report', data_set='chartist', target_dict={'reg_date': today_str})

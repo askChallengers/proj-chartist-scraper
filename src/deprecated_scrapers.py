@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 import pandas as pd
 import re
 import requests
-import xmltodict
+
 import pytz
 from datetime import datetime
 
