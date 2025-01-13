@@ -78,7 +78,7 @@ class YoutubeScraper(BaseScraper):
         url = urljoin(self.base_url, end_point)
         try:
             driver.get(url)
-            elements = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
+            elements = WebDriverWait(driver, 90).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
             # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
             elem = elements[0]
             specific_title_elem = elem.find_element(by=By.XPATH, value='.//*[@id="video-title"]')
