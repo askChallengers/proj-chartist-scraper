@@ -25,7 +25,7 @@ RUN ls -R /app
 RUN echo $PYTHONPATH
 
 # Install dependencies
-RUN pip install poetry
+RUN pip install 'poetry>=1.8,<1.9'
 RUN poetry export --without-hashes --format=requirements.txt > requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
