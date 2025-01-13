@@ -35,6 +35,7 @@ class YoutubeScraper(BaseScraper):
         # 한국어 언어 설정
         self.chrome_options.add_argument("--lang=ko-KR")
         self.chrome_options.add_argument("Accept-Language=ko-KR")
+        self.chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
         if EXECUTE_ENV == 'LOCAL':
             self.service = Service(ChromeDriverManager().install())
         else:
@@ -118,7 +119,7 @@ class YoutubeScraper(BaseScraper):
                 print(f'RETRY: {_keyword}')
                 retry_keyword_list += [_keyword]
         driver.quit()
-        
+
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
         for _keyword in retry_keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
