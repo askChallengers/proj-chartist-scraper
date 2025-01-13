@@ -110,7 +110,17 @@ class YoutubeScraper(BaseScraper):
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
+        retry_keyword_list = []
         for _keyword in keyword_list:
+            try:
+                meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
+            except:
+                print(f'RETRY: {_keyword}')
+                retry_keyword_list += [_keyword]
+        driver.quit()
+        
+        driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
+        for _keyword in retry_keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
         driver.quit()
         meta_by_youtube = pd.DataFrame(meta_by_youtube)
