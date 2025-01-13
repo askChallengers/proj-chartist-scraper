@@ -84,7 +84,7 @@ class YoutubeScraper(BaseScraper):
             mv_title = specific_title_elem.get_attribute("title")
             mv_identifier = specific_title_elem.get_attribute("href")
             mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
-            mv_link = f'https://www.youtube.com/watch?v={mv_identifier}'
+            mv_link = f'https://www.youtube.com/watch?v={mv_identifier}&hl=ko&gl=KR'
             channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
             if not channel.startswith('@'):
                 channel = self._parse_channel_url(channel_href=channel, driver=driver)
