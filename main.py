@@ -51,6 +51,10 @@ if not except_artist.empty:
     SlackClient().chat_postMessage(title, contents)
 
 total_info['reg_date'] = pd.to_datetime(today)
+total_info['month'] = total_info['reg_date'].dt.month  # 월 추출
+total_info['week_of_month'] = (total_info['reg_date'].dt.day - 1) // 7 + 1  # 몇째 주 계산
+total_info['week_of_month'] = total_info['week_of_month'].apply(lambda x: '1st' if x == 1 else '2nd' if x == 2 else str(x)+'th')
+
 today_str = today.strftime('%Y-%m-%d')
 
 total_info = total_info[[
@@ -58,6 +62,6 @@ total_info = total_info[[
     'searchKeyword', 
     'channel', 'img_url',
     'mv_channel', 'mv_identifier', 'mv_title', 'mv_link', 'view_count', 'is_official_channel',
-    'reg_date'
+    'reg_date', 'month', 'week_of_month'
 ] + color_cols]
 bq_conn.upsert(df=total_info, table_id='daily_report', data_set='chartist', target_dict={'reg_date': today_str})
