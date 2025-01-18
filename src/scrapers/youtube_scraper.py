@@ -5,10 +5,10 @@ import requests
 import xmltodict
 import pytz
 from datetime import datetime
-
+import re
 import time
 from urllib.parse import urljoin
-
+import inspect
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -103,6 +103,7 @@ class YoutubeScraper(BaseScraper):
             }
         except TimeoutException:
             print('- TIMEOUT: GET THE FAKE KEYWORD')
+            self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=channel, driver=driver)
             driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
             time.sleep(3)
         except Exception as e:
@@ -118,6 +119,7 @@ class YoutubeScraper(BaseScraper):
                 meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
             except:
                 print(f'RETRY: {_keyword}')
+                self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=_keyword, driver=driver)
                 retry_keyword_list += [_keyword]
         driver.quit()
 
@@ -138,6 +140,18 @@ class YoutubeScraper(BaseScraper):
         element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath)))
         return element.get_attribute('src')
     
+    @log_method_call
+    def save_screenshot_to_gcs(self, function_name:str, target_name: str, driver: webdriver.Chrome):
+        png = driver.get_screenshot_as_png()
+        clean_target_name = re.sub(r'[^\w\s.-]', '', target_name.replace(' ', '_'))
+        storage_file_name = f'{datetime.now(tz=kst).strftime("%Y%m%d%H%M")}_{clean_target_name}.png'
+        # GCS 업로드
+        self.gcs_client.upload_from_memory(
+            contents=png,
+            destination=f'screenshot/{function_name.upper()}_{storage_file_name}',
+            content_type='image/png'
+        )
+
     @log_method_call
     def update_channel_info_sheet(self, sheet='official_channels'):
         sheet = GSheetsConn(url=GOOGLE_SHEET_URL).get_worksheet(sheet='official_channels')
