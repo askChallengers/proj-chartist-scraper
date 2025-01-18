@@ -43,6 +43,7 @@ class YoutubeScraper(BaseScraper):
             self.chrome_options.add_argument('--disable-dev-shm-usage') # 공유 메모리 사용하지 않도록 하는 옵션
 
         if is_headless:
+            self.chrome_options.add_argument("--disable-blink-features=AutomationControlled")  # 자동화 탐지 방지
             self.chrome_options.add_argument("--no-sandbox") #샌드박스 모드 해제(보안 문제있을 수 있음)
             self.chrome_options.add_argument('window-size=1920x1080')
             self.chrome_options.add_argument("disable-gpu")
