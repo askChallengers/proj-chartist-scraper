@@ -9,6 +9,7 @@ from datetime import datetime
 from src.config.helper import log_method_call
 from src.connection.gsheets import GSheetsConn
 from src.connection.bigquery import BigQueryConn
+from src.connection.cloud_storage import GCSConn
 from src.config.env import GOOGLE_SHEET_URL
 
 # KST (Korea Standard Time) 시간대를 설정
@@ -24,6 +25,7 @@ class BaseScraper(ABC):
     # 클래스 변수
     gs_cleint = GSheetsConn(url=GOOGLE_SHEET_URL)
     bq_cleint = BigQueryConn()
+    gcs_client = GCSConn(bucket='team-ask-storage')
     except_albums = gs_cleint.get_df_from_google_sheets(sheet='except_albums')
     except_artists = gs_cleint.get_df_from_google_sheets(sheet='except_artists')
     official_channels = gs_cleint.get_df_from_google_sheets(sheet='official_channels')

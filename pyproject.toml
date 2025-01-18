@@ -24,6 +24,8 @@ google-apps-chat = "*"
 opencv-python = "*"
 matplotlib = "*"
 scikit-learn = "*"
+google-cloud-storage = "*"
+pickle5 = "*"
 
 
 [build-system]
