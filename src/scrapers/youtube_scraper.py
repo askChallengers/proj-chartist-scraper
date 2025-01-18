@@ -144,11 +144,11 @@ class YoutubeScraper(BaseScraper):
     def save_screenshot_to_gcs(self, function_name:str, target_name: str, driver: webdriver.Chrome):
         png = driver.get_screenshot_as_png()
         clean_target_name = re.sub(r'[^\w\s.-]', '', target_name.replace(' ', '_'))
-        storage_file_name = f'{datetime.now(tz=kst).strftime("%Y%m%d%H%M")}_{clean_target_name}.png'
+        storage_file_name = f'screenshot/{datetime.now(tz=kst).strftime("%Y%m%d%H%M")}_{function_name.upper()}_{clean_target_name}.png'
         # GCS 업로드
         self.gcs_client.upload_from_memory(
             contents=png,
-            destination=f'screenshot/{function_name.upper()}_{storage_file_name}',
+            destination=storage_file_name,
             content_type='image/png'
         )
 
