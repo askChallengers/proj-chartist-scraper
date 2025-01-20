@@ -62,9 +62,11 @@ class YoutubeScraper(BaseScraper):
             return {'view_count': view_count}
         except TimeoutException:
             print('- TIMEOUT: GET THE FAKE KEYWORD')
-            driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
+            self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='count_info_TimeoutException', driver=driver)
+            driver.get('https://www.youtube.com/results?search_query=count_info')
             time.sleep(3)
         except Exception as e:
+            self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='count_info_e', driver=driver)
             raise e
 
     def _parse_channel_url(self, channel_href: str, driver: webdriver.Chrome):
@@ -107,9 +109,10 @@ class YoutubeScraper(BaseScraper):
         except TimeoutException:
             print('- TIMEOUT: GET THE FAKE KEYWORD')
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=channel, driver=driver)
-            driver.get('https://www.youtube.com/results?search_query=FAKE_KEYWORD')
+            driver.get('https://www.youtube.com/results?search_query=info_by_youtube')
             time.sleep(3)
         except Exception as e:
+            self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='e', driver=driver)
             raise e
 
     @log_method_call
