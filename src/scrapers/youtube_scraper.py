@@ -58,6 +58,7 @@ class YoutubeScraper(BaseScraper):
             WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
             str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
             view_count = int(re.sub(r'[^0-9]', '', str_view_count))
+            print(f'[_parse_content_count_info] view_count: {view_count}')
             return {'view_count': view_count}
         except TimeoutException:
             print('- TIMEOUT: GET THE FAKE KEYWORD')
@@ -92,7 +93,8 @@ class YoutubeScraper(BaseScraper):
                 channel = self._parse_channel_url(channel_href=channel, driver=driver)
             channel = channel.replace('https://www.youtube.com/', '')
             mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
-            return {
+
+            result = {
                 'searchKeyword': keyword,
                 'mv_channel': channel,
                 'mv_identifier': mv_identifier,
@@ -101,6 +103,7 @@ class YoutubeScraper(BaseScraper):
                 'view_count': mv_count_info['view_count'],
                 # 'comment_count': mv_count_info['comment_count'],
             }
+            return result
         except TimeoutException:
             print('- TIMEOUT: GET THE FAKE KEYWORD')
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=channel, driver=driver)
