@@ -7,6 +7,7 @@ import pytz
 from datetime import datetime
 import re
 import time
+import random
 from urllib.parse import urljoin
 import inspect
 from selenium import webdriver
@@ -82,6 +83,7 @@ class YoutubeScraper(BaseScraper):
         url = urljoin(self.base_url, end_point)
         try:
             driver.get(url)
+            time.sleep(random.randint(1, 10))
             elements = WebDriverWait(driver, 90).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
             # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
             elem = elements[0]
@@ -110,7 +112,7 @@ class YoutubeScraper(BaseScraper):
             print('- TIMEOUT: GET THE FAKE KEYWORD')
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=channel, driver=driver)
             driver.get('https://www.youtube.com/results?search_query=info_by_youtube')
-            time.sleep(3)
+            time.sleep(random.randint(1, 10))
         except Exception as e:
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='e', driver=driver)
             raise e
@@ -142,6 +144,7 @@ class YoutubeScraper(BaseScraper):
     def get_channel_img_url(self, channel: str, driver: webdriver.Chrome) -> str:
         channel_url = f'https://www.youtube.com/{channel}'
         driver.get(channel_url)
+        time.sleep(random.randint(1, 10))
         xpath = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/yt-decorated-avatar-view-model/yt-avatar-shape/div/div/div/img'
         element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath)))
         return element.get_attribute('src')
