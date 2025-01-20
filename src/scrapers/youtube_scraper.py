@@ -49,12 +49,18 @@ class YoutubeScraper(BaseScraper):
             self.chrome_options.add_argument('window-size=1920x1080')
             self.chrome_options.add_argument("disable-gpu")
             self.chrome_options.add_argument('headless')
+
+            # 자동화 감지 속성 제거
+            self.chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            self.chrome_options.add_experimental_option("useAutomationExtension", False)
+
         else:
             self.chrome_options = None
     
     def _parse_content_count_info(self, mv_link: str, driver: webdriver.Chrome) -> dict:
         try:
             driver.get(mv_link)
+            time.sleep(random.randint(3, 10))
             xpath_value = '//*[@id="watch7-content"]/meta[11]'
             WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, xpath_value)))
             str_view_count = driver.find_element(by=By.XPATH, value=xpath_value).get_attribute('content')
@@ -65,13 +71,14 @@ class YoutubeScraper(BaseScraper):
             print('- TIMEOUT: GET THE FAKE KEYWORD')
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='count_info_TimeoutException', driver=driver)
             driver.get('https://www.youtube.com/results?search_query=count_info')
-            time.sleep(3)
+            time.sleep(random.randint(3, 10))
         except Exception as e:
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='count_info_e', driver=driver)
             raise e
 
     def _parse_channel_url(self, channel_href: str, driver: webdriver.Chrome):
         driver.get(channel_href)
+        time.sleep(random.randint(3, 10))
         channel_section = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/div/yt-content-metadata-view-model/div[1]/span'
         WebDriverWait(driver, 30).until(EC.presence_of_all_elements_located((By.XPATH, channel_section)))
         channel = driver.find_element(by=By.XPATH, value=channel_section).text
@@ -83,7 +90,7 @@ class YoutubeScraper(BaseScraper):
         url = urljoin(self.base_url, end_point)
         try:
             driver.get(url)
-            time.sleep(random.randint(1, 10))
+            time.sleep(random.randint(3, 10))
             elements = WebDriverWait(driver, 90).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="contents"]/ytd-video-renderer')))
             # 검색 후 최상단에 있는 것만 파싱해서 가져온다.
             elem = elements[0]
@@ -112,7 +119,7 @@ class YoutubeScraper(BaseScraper):
             print('- TIMEOUT: GET THE FAKE KEYWORD')
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name=channel, driver=driver)
             driver.get('https://www.youtube.com/results?search_query=info_by_youtube')
-            time.sleep(random.randint(1, 10))
+            time.sleep(random.randint(3, 10))
         except Exception as e:
             self.save_screenshot_to_gcs(function_name=inspect.currentframe().f_code.co_name, target_name='e', driver=driver)
             raise e
@@ -121,6 +128,17 @@ class YoutubeScraper(BaseScraper):
     def crawl_youtube_search(self, keyword_list: list) -> pd.DataFrame:
         meta_by_youtube = []
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                """
+            }
+        )
+
         retry_keyword_list = []
         for _keyword in keyword_list:
             try:
@@ -132,6 +150,17 @@ class YoutubeScraper(BaseScraper):
         driver.quit()
 
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                """
+            }
+        )
+
         for _keyword in retry_keyword_list:
             meta_by_youtube += [self._parse_content_info_by_youtube(keyword=_keyword, driver=driver)]
         driver.quit()
@@ -144,7 +173,7 @@ class YoutubeScraper(BaseScraper):
     def get_channel_img_url(self, channel: str, driver: webdriver.Chrome) -> str:
         channel_url = f'https://www.youtube.com/{channel}'
         driver.get(channel_url)
-        time.sleep(random.randint(1, 10))
+        time.sleep(random.randint(3, 10))
         xpath = '//*[@id="page-header"]/yt-page-header-renderer/yt-page-header-view-model/div/div[1]/yt-decorated-avatar-view-model/yt-avatar-shape/div/div/div/img'
         element = WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, xpath)))
         return element.get_attribute('src')
@@ -167,6 +196,17 @@ class YoutubeScraper(BaseScraper):
 
         # 크롤러로 이미지 파싱
         driver = webdriver.Chrome(service=self.service, options=self.chrome_options)
+        driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined
+                });
+                """
+            }
+        )
+
         img_dict = {}
         for channel in self.official_channels['channel'].unique():
             img_url = self.get_channel_img_url(channel=channel, driver=driver)
