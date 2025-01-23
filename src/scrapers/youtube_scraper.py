@@ -98,12 +98,15 @@ class YoutubeScraper(BaseScraper):
             mv_title = specific_title_elem.get_attribute("title")
             mv_identifier = specific_title_elem.get_attribute("href")
             mv_identifier = mv_identifier.split('/watch?')[1].split('v=')[1].split('&')[0]
+
             mv_link = f'https://www.youtube.com/watch?v={mv_identifier}&hl=ko&gl=KR'
             channel = elem.find_element(by=By.XPATH, value='.//*[@id="channel-thumbnail"]').get_attribute("href")
             if not channel.startswith('@'):
                 channel = self._parse_channel_url(channel_href=channel, driver=driver)
             channel = channel.replace('https://www.youtube.com/', '')
-            mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
+            response = requests.get(f'https://api.socialcounts.org/youtube-video-live-view-count/{mv_identifier}', timeout=90).json()
+            view_count = response['est_sub']
+            # mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
 
             result = {
                 'searchKeyword': keyword,
@@ -111,7 +114,8 @@ class YoutubeScraper(BaseScraper):
                 'mv_identifier': mv_identifier,
                 'mv_title': mv_title,
                 'mv_link':mv_link,
-                'view_count': mv_count_info['view_count'],
+                # 'view_count': mv_count_info['view_count'],
+                'view_count': view_count,
                 # 'comment_count': mv_count_info['comment_count'],
             }
             return result
