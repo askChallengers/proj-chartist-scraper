@@ -104,8 +104,17 @@ class YoutubeScraper(BaseScraper):
             if not channel.startswith('@'):
                 channel = self._parse_channel_url(channel_href=channel, driver=driver)
             channel = channel.replace('https://www.youtube.com/', '')
-            response = requests.get(f'https://api.socialcounts.org/youtube-video-live-view-count/{mv_identifier}', timeout=90).json()
-            view_count = response['est_sub']
+            view_count = None
+            for _ in range(5):
+                response = requests.get(f'https://api.socialcounts.org/youtube-video-live-view-count/{mv_identifier}', timeout=90)
+                response.raise_for_status()
+                if int(response.status_code) == 200:
+                    view_count = response.json()['est_sub']
+                print(f'youtube-video-live-view-count({mv_identifier}):', response.text)
+                print('youtube_url:', mv_link)
+                time.sleep(random.randint(3, 10))
+            if view_count is None:
+                raise Exception('youtube-video-live-view-count')
             # mv_count_info = self._parse_content_count_info(mv_link=mv_link, driver=driver)
 
             result = {
