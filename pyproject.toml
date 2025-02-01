@@ -26,6 +26,7 @@ matplotlib = "*"
 scikit-learn = "*"
 google-cloud-storage = "*"
 pickle5 = "*"
+google-api-python-client = "*"
 
 
 [build-system]
