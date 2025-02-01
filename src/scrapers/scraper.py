@@ -121,6 +121,7 @@ class BaseScraper(ABC):
         self.gs_cleint.update_google_sheet_column(self.official_channels, 'img_url', sheet)
         self.gs_cleint.update_google_sheet_column(self.official_channels, 'update_dt', sheet)
 
+    @log_method_call
     def slack_alert(self, df: pd.DataFrame):
         new_artists = df.loc[df['is_new_artist'] == True]
         if new_artists.shape[0] != 0:
@@ -156,6 +157,7 @@ class BaseScraper(ABC):
                 contents += f'✅ `{_nm}`: <{_url}|{_mv_nm}>\n'
             SlackClient().chat_postMessage(title, contents)
 
+    @log_method_call
     def fetch_meta_info(self, df: pd.DataFrame) -> pd.DataFrame:
         result = df.copy()
         meta_info = self.official_channels[~self.official_channels['artistId'].isna()].rename(
@@ -174,6 +176,7 @@ class BaseScraper(ABC):
         result.loc[result['artist_img_url'].isna(), 'is_new_artist'] = True
         return result
 
+    @log_method_call
     def fetch_search_mv_info(self, df: pd.DataFrame) -> pd.DataFrame:
         result = df.copy()
         result['searchKeyword'] = result.apply(lambda x: f"{x['artistName']} {x['trackTitle']} official MV", axis=1)
@@ -202,6 +205,7 @@ class BaseScraper(ABC):
         )
         return result
     
+    @log_method_call
     def fetch_color_info(self, df: pd.DataFrame, color_cnt: int) -> pd.DataFrame:
         result = df.copy()
         color_df = []
