@@ -6,14 +6,13 @@ import xmltodict
 from urllib.parse import urljoin
 
 from src.config.helper import log_method_call
-from .base_scraper import BaseScraper
 
 def requests_get_xml(url) -> dict:
     response = requests.get(url)
     xml_data = response.content
     return xmltodict.parse(xml_data)
 
-class VibeScraper(BaseScraper):
+class Vibe():
     base_url = 'https://apis.naver.com'
 
     @log_method_call
@@ -100,12 +99,12 @@ class VibeScraper(BaseScraper):
         ]
     
     @log_method_call
-    def get_target_info_by_vibe(self, ranking:int=100):
+    def get_target_info_by_vibe(self, except_artists: pd.DataFrame, except_albums: pd.DataFrame, ranking:int=100):
         # top100 차트에서 가수 정보만 추출한다.
         chart_df = self.get_top100_chart()
         artist_info = chart_df.loc[
             chart_df['vibe_rank'].isin(range(ranking+1)) &\
-            ~chart_df['artistId'].isin(self.except_artists['artistId']),
+            ~chart_df['artistId'].isin(except_artists['artistId']),
             ['vibe_rank', 'artistId', 'artistName']
         ].sort_values(by='vibe_rank').drop_duplicates(keep='first')
 
@@ -118,7 +117,7 @@ class VibeScraper(BaseScraper):
             if specific_artist_info['gender'] not in ('남성', '여성'):
                 continue
 
-            tmp_block_album_list =  self.except_albums[lambda x: x['artistId'] == _artistId]['albumId'].to_list()
+            tmp_block_album_list =  except_albums[lambda x: x['artistId'] == _artistId]['albumId'].to_list()
             latest_album_info = self.get_latest_album_info_by_artistId(int(_artistId), tmp_block_album_list)
             tmp = latest_album_info.merge(pd.DataFrame([specific_artist_info]), on='artistId', how='left')
             latest_album_info_by_artistId += [tmp]
