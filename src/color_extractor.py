@@ -64,7 +64,7 @@ def get_dominant_color_by_url(url:str, cnt: int=3) -> dict:
     
     pastel_colors = []
     for color in rgb_colors:
-        brightened = brighten_color(color, increment=50)  # Step 1: Brighten
+        brightened = brighten_color(color, increment=25)  # Step 1: Brighten
         pastel = desaturate_color(brightened, factor=0.6) # Step 2: Reduce Saturation
         pastel_colors.append(pastel)
 
